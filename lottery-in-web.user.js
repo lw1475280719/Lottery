@@ -1868,7 +1868,7 @@
                                                             attr: {
                                                                 type: 'number',
                                                                 name: 'day',
-                                                                value: '15',
+                                                                value: '0',
                                                             }
                                                         }),
                                                         createCompleteElement({
@@ -2299,9 +2299,9 @@
                                         const { isMe } = await BiliAPI.getLotteryNotice(dyid);
                                         isMe === '中奖了！！！' ? Toollayer.alert('恭喜！！！中奖了', `前往 ${linkMsg(`https://t.bilibili.com/${dyid}`)} 查看。`) : Tooltip.log('未中奖');
                                         Tooltip.log(`移除过期官方或非官方动态${dyid}`);
-                                        if (typeof dyid !== 'undefined' && model[0] === '1') BiliAPI.rmDynamic(dyid);
-                                        if (typeof ouid !== 'undefined' && model[1] === '1') BiliAPI.cancelAttention(ouid);
-                                        if (model === '11') GlobalVar.deleteLotteryInfo(odyid);
+                                        if (typeof dyid === 'string' && dyid !== '' && model[0] === '1') BiliAPI.rmDynamic(dyid);
+                                        if (typeof ouid === 'number' && model[1] === '1') BiliAPI.cancelAttention(ouid);
+                                        await GlobalVar.deleteLotteryInfo(odyid);
                                         await Base.delay(time * 1000);
                                     }
                                     Toollayer.alert('清理动态完毕', `<li>共查看<code>${i}</code>条动态</li><li>能识别开奖时间的:共<code>${j}</code>条 过期<code>${k}</code>条 未开奖<code>${j - k}</code>条</li>`);
@@ -2312,7 +2312,8 @@
                                     (value) => {
                                         isNaN(value) ? (() => { Toollayer.msg('输入数据不是数字', 2000, 2) })()
                                             : (() => { time = Number(value); fn(); })();
-                                    }
+                                    },
+                                    6
                                 );
                                 Toollayer.confirm(
                                     '选择删除的内容',
@@ -2386,7 +2387,8 @@
                                             (value) => {
                                                 isNaN(value) ? Toollayer.msg('输入数据不是数字', 2000, 2)
                                                     : (() => { time = Number(value); fn(); })();
-                                            }
+                                            },
+                                            6
                                         );
                                         Toollayer.confirm(
                                             '选择删除的内容',
