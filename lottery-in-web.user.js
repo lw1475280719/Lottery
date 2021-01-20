@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bili动态抽奖助手
 // @namespace    http://tampermonkey.net/
-// @version      3.8.6
+// @version      3.8.8
 // @description  自动参与B站"关注转发抽奖"活动
 // @author       shanmite
 // @include      /^https?:\/\/space\.bilibili\.com/[0-9]*/
@@ -1095,7 +1095,7 @@
                     oid: rid,
                     type: type,
                     message: msg,
-                    jsonp: 'jsonp',
+                    ordering: 'heat',
                     csrf: GlobalVar.csrf
                 },
                 success: responseText => {
@@ -1517,9 +1517,10 @@
             if (tagid === 0) { Tooltip.log('未能成功获取关注分区id'); return }
             this.tagid = tagid; /* 检查关注分区 */
             this.attentionList = await BiliAPI.getAttentionList(GlobalVar.myUID);
+            this.AllMyLotteryInfo = Object.keys(Base.strToJson(await GlobalVar.getAllMyLotteryInfo())).toString();
             const isAdd = await this.startLottery();
             if (isAdd) {
-                let cADynamic = (await this.checkAllDynamic(GlobalVar.myUID, 2)).allModifyDynamicResArray; /* 检查我的所有动态 */
+                let cADynamic = (await this.checkAllDynamic(GlobalVar.myUID, 5)).allModifyDynamicResArray; /* 检查我的所有动态 */
                 /**
                  * 储存转发过的动态信息
                  */
@@ -1539,19 +1540,16 @@
         async startLottery() {
             const allLottery = await this.filterLotteryInfo();
             const len = allLottery.length;
-            let index = 0;
             if (len === 0) {
                 eventBus.emit('Turn_on_the_Monitor');
                 return false;
             } else {
                 for (const Lottery of allLottery) {
                     await this.go(Lottery);
-                    if (index++ === len - 1) {
-                        Tooltip.log('开始转发下一组动态');
-                        eventBus.emit('Turn_on_the_Monitor');
-                        return true;
-                    }
                 }
+                Tooltip.log('开始转发下一组动态');
+                eventBus.emit('Turn_on_the_Monitor');
+                return true;
             }
         }
         /**
@@ -1625,7 +1623,7 @@
                     /* 判断是否关注过 */
                     const isFollowed = (new RegExp(uid)).test(self.attentionList);
                     /* 判断是否转发过 */
-                    const isRelay = (new RegExp(dyid)).test(await GlobalVar.getAllMyLotteryInfo());
+                    const isRelay = (new RegExp(dyid)).test(self.AllMyLotteryInfo);
                     if (only_followed === '1' && !isFollowed) continue;
                     if ((new RegExp(dyid + '|' + uid)).test(blacklist)) continue;
                     if (!isFollowed) onelotteryinfo.uid = uid;
