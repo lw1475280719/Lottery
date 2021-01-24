@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bili动态抽奖助手
 // @namespace    http://tampermonkey.net/
-// @version      3.8.8
+// @version      3.8.9
 // @description  自动参与B站"关注转发抽奖"活动
 // @author       shanmite
 // @include      /^https?:\/\/space\.bilibili\.com/[0-9]*/
@@ -258,7 +258,7 @@
             };
         },
         /**
-         * @returns {Promise<object>} 设置
+         * @returns {Promise<JSON>} 设置
          */
         getMyJson() {
             return new Promise((resolve) => {
@@ -1439,6 +1439,7 @@
             for (let index = 0; index < 3; index++) {
                 const newdy = await BiliAPI.getOneDynamicInfoByTag(tag_name, next_offset);
                 const _modify = self.modifyDynamicRes(newdy);
+                if (_modify === null) return null;
                 mDRdata.push.apply(mDRdata, _modify.modifyDynamicResArray);
                 next_offset = _modify.nextinfo.next_offset;
             }
@@ -1581,7 +1582,9 @@
          */
         async filterLotteryInfo() {
             const self = this,
-                protoLotteryInfo = typeof self.UID === 'number' ? await self.getLotteryInfoByUID(self.UID) : await self.getLotteryInfoByTag(self.tag_name);
+                protoLotteryInfo = typeof self.UID === 'number' ?
+                    await self.getLotteryInfoByUID(self.UID) :
+                    await self.getLotteryInfoByTag(self.tag_name);
             if (protoLotteryInfo === null) return [];
             let alllotteryinfo = [];
             const { model, chatmodel, only_followed, maxday: _maxday, minfollower, blockword, blacklist } = config;
@@ -2669,10 +2672,12 @@
         await GlobalVar.getAllMyLotteryInfo(); /* 转发信息初始化 */
         const remoteparm = await Base.getMyJson(); /* 获取热更新的默认设置 */
         config = remoteparm.config; /* 初始化设置 */
-        if (Base.checkVersion(remoteparm.version) > Base.checkVersion(Script.version)) {
+        const hasLastestVersion = Base.checkVersion(remoteparm.version) > Base.checkVersion(Script.version);
+        if (hasLastestVersion) {
+            const { version, message } = remoteparm;
             Toollayer.confirm(
                 '更新提醒',
-                `最新版本为 <strong>${remoteparm.version}</strong><br>是否更新?`,
+                `最新版本为 <strong>${version}</strong><br>${message}<br>是否更新?`,
                 ['是', '否'],
                 () => { window.location.href = 'https://greasyfork.org/zh-CN/scripts/412468-bili%E5%8A%A8%E6%80%81%E6%8A%BD%E5%A5%96%E5%8A%A9%E6%89%8B' },
                 () => { Toollayer.msg('稍后更新') }
@@ -2689,13 +2694,36 @@
             } else {
                 /**本地设置 */
                 let _config = JSON.parse(configstr);
+                const config_keys = [
+                    "model",
+                    "chatmodel",
+                    "only_followed",
+                    "maxday",
+                    "scan_time",
+                    "wait",
+                    "minfollower",
+                    "blockword",
+                    "blacklist",
+                    "whitelist",
+                    "relay",
+                    "chat",
+                    "UIDs",
+                    "TAGs"
+                ];
                 Object.keys(config).forEach(key => {
                     if (typeof _config[key] === 'undefined') {
                         _config[key] = config[key]
                     } else {
-                        if (key === 'blacklist') _config[key] = Array.from(new Set([..._config[key].split(','), ...config[key].split(',')])).toString();
+                        if (key === 'blacklist')
+                            _config[key] = Array.from(new Set([..._config[key].split(','), ...config[key].split(',')])).toString();
                     }
-                })
+                });
+                if (hasLastestVersion) {
+                    [...remoteparm.flush].forEach((isflush, i) => {
+                        const key = config_keys[i]
+                        if (isflush) _config[key] = config[key];
+                    })
+                }
                 config = _config;
             }
             Lottery = [...config.UIDs, ...config.TAGs].filter(lottery => lottery !== '');
