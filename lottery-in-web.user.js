@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bili动态抽奖助手
 // @namespace    http://tampermonkey.net/
-// @version      3.8.10
+// @version      3.8.11
 // @description  自动参与B站"关注转发抽奖"活动
 // @author       shanmite
 // @include      /^https?:\/\/space\.bilibili\.com/[0-9]*/
@@ -1391,9 +1391,13 @@
                         obj.origin_rid_str = desc.origin.rid_str /* 被转发者的rid(用于发评论) */
                         obj.origin_dynamic_id = desc.orig_dy_id_str; /* 被转发者的动态的ID !!!!此为大数需使用字符串值,不然JSON.parse()会有丢失精度 */
                         const { origin_extension, origin_user } = cardToJson;
-                        obj.origin_official_verify = typeof origin_user === 'undefined' ?
-                            false : origin_user.card.official_verify.type < 0 ?
-                                false : true; /* 是否官方号 */
+                        try {
+                            obj.origin_official_verify = typeof origin_user === 'undefined' ?
+                                false : origin_user.card.official_verify.type < 0 ?
+                                    false : true; /* 是否官方号 */
+                        } catch (error) {
+                            obj.origin_official_verify = false;
+                        }
                         obj.origin_hasOfficialLottery = typeof origin_extension === 'undefined' ?
                             false : typeof origin_extension.lott === 'undefined' ?
                                 false : true; /* 是否有官方抽奖 */
@@ -2681,7 +2685,7 @@
         const remoteparm = await Base.getMyJson(); /* 获取热更新的默认设置 */
         /** 默认设置 */
         const remoteconfig = remoteparm.config;
-        config = remoteparm; /**设置初始化 */
+        config = remoteconfig; /**设置初始化 */
         /**是否有最新版 */
         if (Base.checkVersion(remoteparm.version) > Base.checkVersion(Script.version)) {
             const { version, message } = remoteparm;
