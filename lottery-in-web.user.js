@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bili动态抽奖助手
 // @namespace    http://tampermonkey.net/
-// @version      3.8.9
+// @version      3.8.10
 // @description  自动参与B站"关注转发抽奖"活动
 // @author       shanmite
 // @include      /^https?:\/\/space\.bilibili\.com/[0-9]*/
@@ -1444,8 +1444,8 @@
                 next_offset = _modify.nextinfo.next_offset;
             }
             const fomatdata = mDRdata.map(o => {
-                const hasOrigin = o.type === 1
-                return {
+                const hasOrigin = o.type === 1;
+                const info = {
                     uid: o.uid,
                     dyid: o.dynamic_id,
                     official_verify: o.official_verify,
@@ -1454,7 +1454,12 @@
                     des: o.description,
                     type: o.type,
                     hasOfficialLottery: o.hasOfficialLottery
-                }
+                };
+                return o.orig_type === 8 ?
+                    {
+                        ...info,
+                        dyid: o.origin_dynamic_id
+                    } : info;
             })
             Tooltip.log(`成功获取带话题#${tag_name}#的动态信息`);
             return fomatdata
@@ -1632,7 +1637,10 @@
                     if (!isFollowed) onelotteryinfo.uid = uid;
                     if (!isRelay) onelotteryinfo.dyid = dyid;
                     /* 根据动态的类型决定评论的类型 */
-                    onelotteryinfo.type = (type === 2) ? 11 : (type === 4) ? 17 : 0;
+                    onelotteryinfo.type = type === 2 ?
+                        11 : type === 4 ?
+                            17 : type === 8 ?
+                                1 : 0;
                     /* 是否评论 */
                     isSendChat ? onelotteryinfo.rid = rid : void 0;
                     if (typeof onelotteryinfo.uid === 'undefined' && typeof onelotteryinfo.dyid === 'undefined') continue;
@@ -2671,9 +2679,11 @@
         if (!Base.checkHref(window.location.href) || !Base.checkBrowser(navigator.appVersion)) return;
         await GlobalVar.getAllMyLotteryInfo(); /* 转发信息初始化 */
         const remoteparm = await Base.getMyJson(); /* 获取热更新的默认设置 */
-        config = remoteparm.config; /* 初始化设置 */
-        const hasLastestVersion = Base.checkVersion(remoteparm.version) > Base.checkVersion(Script.version);
-        if (hasLastestVersion) {
+        /** 默认设置 */
+        const remoteconfig = remoteparm.config;
+        config = remoteparm; /**设置初始化 */
+        /**是否有最新版 */
+        if (Base.checkVersion(remoteparm.version) > Base.checkVersion(Script.version)) {
             const { version, message } = remoteparm;
             Toollayer.confirm(
                 '更新提醒',
@@ -2710,21 +2720,32 @@
                     "UIDs",
                     "TAGs"
                 ];
-                Object.keys(config).forEach(key => {
-                    if (typeof _config[key] === 'undefined') {
-                        _config[key] = config[key]
-                    } else {
-                        if (key === 'blacklist')
-                            _config[key] = Array.from(new Set([..._config[key].split(','), ...config[key].split(',')])).toString();
-                    }
-                });
-                if (hasLastestVersion) {
-                    [...remoteparm.flush].forEach((isflush, i) => {
-                        const key = config_keys[i]
-                        if (isflush) _config[key] = config[key];
-                    })
+                config = {
+                    ...remoteconfig,
+                    ..._config,
+                    "blacklist": Array.from(new Set([..._config["blacklist"].split(','), ...remoteconfig["blacklist"].split(',')])).toString()
                 }
-                config = _config;
+                /**更新设置选项 */
+                const flush = remoteparm.flush;
+                if (typeof flush === "string" && flush.indexOf('1') !== -1) {
+                    const flush_time = remoteparm.flush_time;
+                    if (flush_time !== await Base.storage.get("flush_time")) {
+                        Toollayer.confirm(
+                            '需要更新设置',
+                            `${remoteparm.flush_msg}`,
+                            ['是', '否'],
+                            () => {
+                                [...flush].forEach((isflush, i) => {
+                                    const key = config_keys[i]
+                                    if (isflush) _config[key] = remoteconfig[key];
+                                })
+                                eventBus.emit('Modify_settings', JSON.stringify(_config));
+                                Base.storage.set("flush_time", flush_time)
+                            },
+                            () => { Toollayer.msg('稍后更新') }
+                        );
+                    }
+                }
             }
             Lottery = [...config.UIDs, ...config.TAGs].filter(lottery => lottery !== '');
             (new MainMenu()).init();
