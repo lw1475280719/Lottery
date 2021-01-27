@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bili动态抽奖助手
 // @namespace    http://tampermonkey.net/
-// @version      3.8.11
+// @version      3.8.12
 // @description  自动参与B站"关注转发抽奖"活动
 // @author       shanmite
 // @include      /^https?:\/\/space\.bilibili\.com/[0-9]*/
@@ -139,11 +139,13 @@
         },
         /**
          * 将版本号转为数字
+         * @example
+         * 1.2.3 => 1.0203
          * @param {string} version
          * @returns {Number}
          */
         checkVersion(version) {
-            return (version.match(/\d.*/)[0]).split('.').reduce((a, v) => a + Number(v), 0)
+            return (version.match(/\d.*/)[0]).split('.').reduce((a,v,i)=>a + (0.01 ** i) * Number(v), 0)
         },
         /**
          * 节流
@@ -1009,10 +1011,11 @@
          * @param {Number} uid
          * 自己的UID
          * @param {string} dyid
+         * @param {string} [msg]
          * 动态的ID
          * @returns {void}
          */
-        autoRelay: (uid, dyid) => {
+        autoRelay: (uid, dyid, msg = '转发动态', ctrl = '[]') => {
             Ajax.post({
                 url: 'https://api.vc.bilibili.com/dynamic_repost/v1/dynamic_repost/repost',
                 hasCookies: true,
@@ -1020,8 +1023,8 @@
                 data: {
                     uid: `${uid}`,
                     dynamic_id: dyid,
-                    content: Base.getRandomStr(config.relay),
-                    extension: '{"emoji_type":1}',
+                    content: msg,
+                    ctrl,
                     csrf: GlobalVar.csrf
                 },
                 success: responseText => {
@@ -1277,6 +1280,7 @@
          * @property {number} type
          * @property {string} description
          * @property {boolean} hasOfficialLottery
+         * @property {Array<Object.<string,string|number>>} ctrl
          * 
          * @property {number} origin_uid
          * @property {string} origin_uname
@@ -1378,11 +1382,12 @@
                     obj.uname = info.uname;/* 转发者的name */
                     obj.official_verify = official_verify.type > -1 ? true : false; /* 是否官方号 */
                     obj.createtime = desc.timestamp /* 动态的ts10 */
-                    obj.rid_str = desc.rid_str;/* 用于发送评论 */
                     obj.type = desc.type /* 动态类型 */
+                    obj.rid_str = obj.type === 1 ? desc.dynamic_id_str : desc.rid_str;/* 用于发送评论 */
                     obj.orig_type = desc.orig_type /* 源动态类型 */
                     obj.dynamic_id = desc.dynamic_id_str; /* 转发者的动态ID !!!!此为大数需使用字符串值,不然JSON.parse()会有丢失精度 */
-                    const { extension } = onecard;
+                    const { extension, extend_json } = onecard;
+                    obj.ctrl = (typeof extend_json === 'undefined') ? [] : strToJson(extend_json).ctrl || []; /* 定位@信息 */
                     obj.hasOfficialLottery = (typeof extension === 'undefined') ? false : typeof extension.lott === 'undefined' ? false : true; /* 是否有官方抽奖 */
                     const item = cardToJson.item || {};
                     obj.description = item.content || item.description || ''; /* 转发者的描述 */
@@ -1417,6 +1422,8 @@
         /**
          * @typedef {object} LotteryInfo
          * @property {number} uid
+         * @property {string} uname
+         * @property {Array<{}>} ctrl
          * @property {string} dyid
          * @property {boolean} befilter
          * @property {boolean} official_verify 官方认证
@@ -1449,8 +1456,10 @@
             }
             const fomatdata = mDRdata.map(o => {
                 const hasOrigin = o.type === 1;
-                const info = {
+                return {
                     uid: o.uid,
+                    uname: o.uname,
+                    ctrl: o.ctrl,
                     dyid: o.dynamic_id,
                     official_verify: o.official_verify,
                     befilter: hasOrigin,
@@ -1459,11 +1468,6 @@
                     type: o.type,
                     hasOfficialLottery: o.hasOfficialLottery
                 };
-                return o.orig_type === 8 ?
-                    {
-                        ...info,
-                        dyid: o.origin_dynamic_id
-                    } : info;
             })
             Tooltip.log(`成功获取带话题#${tag_name}#的动态信息`);
             return fomatdata
@@ -1485,6 +1489,8 @@
                 _fomatdata = mDRdata.map(o => {
                     return {
                         uid: o.origin_uid,
+                        uname: o.origin_uname,
+                        ctrl: [],
                         dyid: o.origin_dynamic_id,
                         official_verify: o.origin_official_verify,
                         befilter: false,
@@ -1583,6 +1589,8 @@
          * @property {number} uid 用户标识
          * @property {string} dyid 动态标识
          * @property {number} type 动态类型
+         * @property {string} relay_chat 动态类型
+         * @property {string} ctrl 定位@
          * @property {string} rid 评论类型
          */
         /**
@@ -1599,7 +1607,7 @@
             const { model, chatmodel, only_followed, maxday: _maxday, minfollower, blockword, blacklist } = config;
             const maxday = _maxday === '-1' || _maxday === '' ? Infinity : (Number(_maxday) * 86400);
             for (const info of protoLotteryInfo) {
-                const { uid, dyid, official_verify, befilter, rid, des, type, hasOfficialLottery } = info;
+                const { uid, uname, dyid, official_verify, ctrl, befilter, rid, des, type, hasOfficialLottery } = info;
                 const now_ts_10 = Date.now() / 1000;
                 let onelotteryinfo = {};
                 let isLottery = false;
@@ -1639,10 +1647,32 @@
                     if (only_followed === '1' && !isFollowed) continue;
                     if ((new RegExp(dyid + '|' + uid)).test(blacklist)) continue;
                     if (!isFollowed) onelotteryinfo.uid = uid;
-                    if (!isRelay) onelotteryinfo.dyid = dyid;
+                    if (!isRelay) {
+                        onelotteryinfo.dyid = dyid;
+                        const RandomStr = Base.getRandomStr(config.relay);
+                        if (type === 1) {
+                            /* 转发内容长度+'//'+'@'+用户名+':'+源内容 */
+                            const addlength = RandomStr.length + 2 + uname.length + 1 + 1;
+                            onelotteryinfo.relay_chat = RandomStr + `//@${uname}:` + des;
+                            let new_ctrl = ctrl.map(item => {
+                                item.location += addlength;
+                                return item;
+                            })
+                            new_ctrl.unshift({
+                                data: String(uid),
+                                location: RandomStr.length + 2,
+                                length: uname.length + 1,
+                                type: 1
+                            })
+                            onelotteryinfo.ctrl = JSON.stringify(new_ctrl);
+                        } else {
+                            onelotteryinfo.relay_chat = RandomStr;
+                            onelotteryinfo.ctrl = '[]'
+                        }
+                    }
                     /* 根据动态的类型决定评论的类型 */
                     onelotteryinfo.type = type === 2 ?
-                        11 : type === 4 ?
+                        11 : type === 4 || type === 1 ?
                             17 : type === 8 ?
                                 1 : 0;
                     /* 是否评论 */
@@ -1660,9 +1690,9 @@
          * @param {LotteryOptions} option
          */
         async go(option) {
-            const { uid, dyid, type, rid } = option;
+            const { uid, dyid, type, rid, relay_chat, ctrl } = option;
             if (typeof dyid === 'string') {
-                BiliAPI.autoRelay(GlobalVar.myUID, dyid);
+                BiliAPI.autoRelay(GlobalVar.myUID, dyid, relay_chat, ctrl);
                 BiliAPI.autolike(dyid);
                 if (typeof uid === 'number') {
                     await BiliAPI.autoAttention(uid);
@@ -2419,7 +2449,7 @@
                                                 () => {
                                                     Toollayer.confirm(
                                                         '是否清空本地存储',
-                                                        '如果动态数量少于10条，请点击确定以清空本地存储。',
+                                                        '请点击确定以清空本地存储。',
                                                         ['确定', '取消'],
                                                         () => { Base.storage.set(GlobalVar.myUID, '{}') },
                                                         () => { Toollayer.msg('已取消') }
@@ -2767,8 +2797,9 @@
                 }, Number(config.scan_time))
                 return;
             }
-            const nlottery = Number(Lottery[count.next()]);
-            (new Monitor(isNaN(nlottery) ? Lottery[count.next()] : nlottery)).init();
+            let num = count.next();
+            const nlottery = Number(Lottery[num]);
+            (new Monitor(isNaN(nlottery) ? Lottery[num] : nlottery)).init();
         });
         eventBus.on('Modify_settings', async ({ detail }) => {
             await Base.storage.set('config', detail);
