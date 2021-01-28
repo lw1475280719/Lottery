@@ -145,7 +145,7 @@
          * @returns {Number}
          */
         checkVersion(version) {
-            return (version.match(/\d.*/)[0]).split('.').reduce((a,v,i)=>a + (0.01 ** i) * Number(v), 0)
+            return (version.match(/\d.*/)[0]).split('.').reduce((a, v, i) => a + (0.01 ** i) * Number(v), 0)
         },
         /**
          * 节流
