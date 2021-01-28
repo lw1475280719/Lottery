@@ -2785,13 +2785,20 @@
             (new MainMenu()).init();
         })
         const count = Base.counter();
+        const scan_times = Base.counter();
         eventBus.on('Turn_on_the_Monitor', () => {
             if (Lottery.length === 0) { Tooltip.log('抽奖信息为空'); return }
             if (count.value() === Lottery.length) {
-                Tooltip.log('所有动态转发完毕');
-                Tooltip.log('[运行结束]目前无抽奖信息,过一会儿再来看看吧');
+                const scan_time = Number(config.scan_time) / 60000; /* 分钟 */
+                Toollayer.confirm(
+                    `运行结束(${scan_times.next() + 1})`,
+                    `结束时间 <code>${(new Date(Date.now())).toLocaleString()}</code><br>所有动态转发完毕<br>目前无抽奖信息<br>${scan_time}分钟后将再次扫描`,
+                    ['是', '立即刷新'],
+                    () => { Toollayer.msg('稍后再来') },
+                    () => { location.reload() }
+                );
                 count.clear();
-                Tooltip.log(`${Number(config.scan_time) / 60000}分钟后再次扫描`);
+                Tooltip.log(`${scan_time}分钟后再次扫描`);
                 setTimeout(() => {
                     eventBus.emit('Turn_on_the_Monitor');
                 }, Number(config.scan_time))
