@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bili动态抽奖助手
 // @namespace    http://tampermonkey.net/
-// @version      3.8.12
+// @version      3.8.14
 // @description  自动参与B站"关注转发抽奖"活动
 // @author       shanmite
 // @include      /^https?:\/\/space\.bilibili\.com/[0-9]*/
@@ -100,7 +100,7 @@
             let c = {
                 i: 0,
                 next: () => c.i++,
-                clear: () => c.i = 0,
+                clear: () => { c.i = 0 },
                 value: () => c.i
             }
             return c
@@ -1032,6 +1032,7 @@
                         Tooltip.log('[转发动态]成功转发一条动态');
                     } else {
                         Tooltip.warn(`[转发动态]转发动态失败,请在"错误信息"处手动处理\n${responseText}`);
+                        GlobalVar.deleteLotteryInfo(dyid); /* 转发失败自动移除 */
                         errorbar.appendChild(Base.createCompleteElement({
                             tagname: 'a',
                             attr: {
@@ -1236,6 +1237,8 @@
              * @param {string} odyid
              * @param {number|0} ts
              * @param {number} ouid 
+             * @example
+             * odyid: [dyid, ts, ouid]
              */
             addLotteryInfo: async (dyid, odyid, ts, ouid) => {
                 const allMyLotteryInfo = await getAllMyLotteryInfo();
@@ -1421,7 +1424,8 @@
         }
         /**
          * @typedef {object} LotteryInfo
-         * @property {number} uid
+         * @property {string} lottery_info_type
+         * @property {number[]} uids `[uid,ouid]`
          * @property {string} uname
          * @property {Array<{}>} ctrl
          * @property {string} dyid
@@ -1457,7 +1461,8 @@
             const fomatdata = mDRdata.map(o => {
                 const hasOrigin = o.type === 1;
                 return {
-                    uid: o.uid,
+                    lottery_info_type: 'tag',
+                    uids: [o.uid, o.origin_uid],
                     uname: o.uname,
                     ctrl: o.ctrl,
                     dyid: o.dynamic_id,
@@ -1488,7 +1493,8 @@
             const mDRdata = modDR.modifyDynamicResArray,
                 _fomatdata = mDRdata.map(o => {
                     return {
-                        uid: o.origin_uid,
+                        lottery_info_type: 'uid',
+                        uids: [o.uid, o.origin_uid],
                         uname: o.origin_uname,
                         ctrl: [],
                         dyid: o.origin_dynamic_id,
@@ -1586,7 +1592,7 @@
         /**
          * 抽奖配置
          * @typedef {object} LotteryOptions
-         * @property {number} uid 用户标识
+         * @property {number[]} uid 用户标识
          * @property {string} dyid 动态标识
          * @property {number} type 动态类型
          * @property {string} relay_chat 动态类型
@@ -1607,7 +1613,9 @@
             const { model, chatmodel, only_followed, maxday: _maxday, minfollower, blockword, blacklist } = config;
             const maxday = _maxday === '-1' || _maxday === '' ? Infinity : (Number(_maxday) * 86400);
             for (const info of protoLotteryInfo) {
-                const { uid, uname, dyid, official_verify, ctrl, befilter, rid, des, type, hasOfficialLottery } = info;
+                const { lottery_info_type, uids, uname, dyid, official_verify, ctrl, befilter, rid, des, type, hasOfficialLottery } = info;
+                /**判断是转发源动态还是现动态 */
+                const uid = lottery_info_type === 'tag' ? uids[0] : uids[1];
                 const now_ts_10 = Date.now() / 1000;
                 let onelotteryinfo = {};
                 let isLottery = false;
@@ -1646,7 +1654,8 @@
                     const isRelay = (new RegExp(dyid)).test(self.AllMyLotteryInfo);
                     if (only_followed === '1' && !isFollowed) continue;
                     if ((new RegExp(dyid + '|' + uid)).test(blacklist)) continue;
-                    if (!isFollowed) onelotteryinfo.uid = uid;
+                    onelotteryinfo.uid = [] /**初始化待关注列表 */
+                    if (!isFollowed) onelotteryinfo.uid.push(uid);
                     if (!isRelay) {
                         onelotteryinfo.dyid = dyid;
                         const RandomStr = Base.getRandomStr(config.relay);
@@ -1665,6 +1674,7 @@
                                 type: 1
                             })
                             onelotteryinfo.ctrl = JSON.stringify(new_ctrl);
+                            if (!(new RegExp(uids[1])).test(self.attentionList)) onelotteryinfo.uid.push(uids[1]);
                         } else {
                             onelotteryinfo.relay_chat = RandomStr;
                             onelotteryinfo.ctrl = '[]'
@@ -1694,11 +1704,13 @@
             if (typeof dyid === 'string') {
                 BiliAPI.autoRelay(GlobalVar.myUID, dyid, relay_chat, ctrl);
                 BiliAPI.autolike(dyid);
-                if (typeof uid === 'number') {
-                    await BiliAPI.autoAttention(uid);
-                    await Base.delay(3000);
-                    BiliAPI.movePartition(uid, this.tagid);
-                }
+                uid.forEach(async (one_uid) => {
+                    if (typeof one_uid === 'number') {
+                        await BiliAPI.autoAttention(one_uid);
+                        await Base.delay(3000);
+                        BiliAPI.movePartition(one_uid, this.tagid);
+                    }
+                })
                 if (typeof rid === 'string' && type !== 0) {
                     BiliAPI.sendChat(rid, Base.getRandomStr(config.chat), type, true, dyid);
                 }
