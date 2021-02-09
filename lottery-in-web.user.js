@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bili动态抽奖助手
 // @namespace    http://tampermonkey.net/
-// @version      3.8.14
+// @version      3.9.0
 // @description  自动参与B站"关注转发抽奖"活动
 // @author       shanmite
 // @include      /^https?:\/\/space\.bilibili\.com/[0-9]*/
@@ -39,25 +39,21 @@
          * 返回对象或空对象
          */
         strToJson(params) {
-            const iremoteparm = str => {
+            const isJSON = (str => {
                 if (typeof str === 'string') {
                     try {
                         const obj = JSON.parse(str);
-                        return typeof obj === 'object' && obj;
-                    } catch (e) {
-                        console.error(e);
+                        return typeof obj === 'object' ? obj : false
+                    } catch (_) {
+                        console.log(str);
                         return false;
                     }
+                } else {
+                    console.log(`${str}\nIt is not a string!`);
+                    return false;
                 }
-                console.error(`${str}<- It is not a string!`);
-                return false;
-            }
-            if (iremoteparm(params)) {
-                let obj = JSON.parse(params);
-                return obj
-            } else {
-                return {}
-            }
+            })(params);
+            return isJSON ? isJSON : {}
         },
         /**
          * 函数柯里化
@@ -797,7 +793,7 @@
          * 并转移分组
          * @param {Number} uid
          * 被关注者的UID
-         * @returns {Promise<null>}
+         * @returns
          */
         autoAttention: uid => {
             return new Promise((resolve) => {
@@ -1088,7 +1084,7 @@
          * 17(无图)  
          * @param {boolean} show
          * @param {string} dyid
-         * @returns {Promise<0 | -1>}
+         * @returns
          */
         sendChat: (rid, msg, type, show, dyid = '') => {
             Ajax.post({
@@ -2826,6 +2822,5 @@
         })
         /* 注册事件 END */
         eventBus.emit('Show_Main_Menu');
-        BiliAPI.sendChat('453380690548954982', (new Date(Date.now())).toLocaleString() + Script.version, 17, false);
     })()
 })();
