@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bili动态抽奖助手
 // @namespace    http://tampermonkey.net/
-// @version      3.9.0
+// @version      3.9.1
 // @description  自动参与B站"关注转发抽奖"活动
 // @author       shanmite
 // @include      /^https?:\/\/space\.bilibili\.com/[0-9]*/
@@ -1012,6 +1012,10 @@
          * @returns {void}
          */
         autoRelay: (uid, dyid, msg = '转发动态', ctrl = '[]') => {
+            const len = msg.length;
+            if (len > 233) {
+                msg = msg.slice(0, 233 - len)
+            }
             Ajax.post({
                 url: 'https://api.vc.bilibili.com/dynamic_repost/v1/dynamic_repost/repost',
                 hasCookies: true,
