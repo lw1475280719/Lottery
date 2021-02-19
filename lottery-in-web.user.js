@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bili动态抽奖助手
 // @namespace    http://tampermonkey.net/
-// @version      3.9.1
+// @version      3.9.2
 // @description  自动参与B站"关注转发抽奖"活动
 // @author       shanmite
 // @include      /^https?:\/\/space\.bilibili\.com/[0-9]*/
@@ -108,6 +108,21 @@
          */
         getRandomStr(arr) {
             return arr[parseInt(Math.random() * arr.length)]
+        },
+        /**
+         * 一言接口
+         * @returns {Promise<string>}
+         */
+        getHiToKoTo() {
+            return new Promise(resolve => {
+                Ajax.get({
+                    url: 'https://v1.hitokoto.cn/?encode=text&c=a&c=b&c=c&c=e',
+                    hasCookies: false,
+                    success: responseText => {
+                        resolve(responseText)
+                    }
+                })
+            });
         },
         /**
          * 判断是否是自己的主页
@@ -1055,6 +1070,29 @@
             })
         },
         /**
+         * 发布一条无图的动态
+         * @param {string} content
+         */
+        createDynamic: content => {
+            Ajax.post({
+                url: 'https://api.vc.bilibili.com/dynamic_svr/v1/dynamic_svr/create',
+                hasCookies: true,
+                dataType: 'application/x-www-form-urlencoded',
+                data: {
+                    content,
+                    type: 4,
+                    csrf: GlobalVar.csrf
+                },
+                success: responseText => {
+                    if (/^{"code":0/.test(responseText)) {
+                        Tooltip.log('[发布动态]成功创建一条随机内容的动态');
+                    } else {
+                        Tooltip.warn(`[发布动态]发布动态失败\n${responseText}`);
+                    }
+                }
+            })
+        },
+        /**
          * 移除动态
          * @param {string} dyid
          * @returns {void}
@@ -1900,7 +1938,7 @@
                                                         }),
                                                         createCompleteElement({
                                                             tagname: 'p',
-                                                            text: '默认移除所有转发动态或临时关注的up, <br>使用前请在在白名单内填入不想移除的动态ID或up主的UID, <br>可定期使用此功能清空无法处理的动态和本地存储信息。',
+                                                            text: '默认移除所有<strong>转发动态</strong>或临时关注的up, <br>使用前请在在白名单内填入不想移除的动态ID或up主的UID, <br>可定期使用此功能清空无法处理的动态和本地存储信息。',
                                                         }),
                                                         createCompleteElement({
                                                             tagname: 'span',
@@ -1928,7 +1966,39 @@
                                                         }),
                                                         createCompleteElement({
                                                             tagname: 'span',
-                                                            text: '天前的所有动态',
+                                                            text: '天前<br>',
+                                                        }),
+                                                        createCompleteElement({
+                                                            tagname: 'label',
+                                                            text: '转发的动态',
+                                                            children: [
+                                                                createCompleteElement({
+                                                                    tagname: 'input',
+                                                                    attr: {
+                                                                        type: 'radio',
+                                                                        name: 'type',
+                                                                        value: '1',
+                                                                        checked: 'checked'
+                                                                    },
+                                                                })
+                                                            ]
+                                                        }),
+                                                        createCompleteElement({
+                                                            tagname: 'label',
+                                                            text: '所有动态',
+                                                            attr: {
+                                                                title: '包含普通动态和转发动态，不包括视频专栏活动等动态'
+                                                            },
+                                                            children: [
+                                                                createCompleteElement({
+                                                                    tagname: 'input',
+                                                                    attr: {
+                                                                        type: 'radio',
+                                                                        name: 'type',
+                                                                        value: '1||2||4'
+                                                                    },
+                                                                })
+                                                            ]
                                                         }),
                                                     ]
                                                 })
@@ -2393,7 +2463,8 @@
                                         const { whitelist } = config;
                                         const {
                                             day,
-                                            page
+                                            page,
+                                            type: dytype
                                         } = rmdyForm;
                                         const _time = Date.now() / 1000 - Number(day.value) * 86400;
                                         const tagid = await BiliAPI.checkMyPartition();
@@ -2408,7 +2479,8 @@
                                                     for (let index = 0; index < allModifyDynamicResArray.length; index++) {
                                                         const res = allModifyDynamicResArray[index];
                                                         const { type, createtime, dynamic_id } = res;
-                                                        if (type === 1) {
+                                                        const dytypevalue = dytype.value;
+                                                        if (type === 1 || (dytypevalue === '1||2||4' && (type === 2 || type === 4))) {
                                                             const reg1 = new RegExp(dynamic_id);
                                                             if (createtime < _time && !reg1.test(whitelist)) BiliAPI.rmDynamic(dynamic_id);
                                                             await Base.delay(Number(time) * 1000);
@@ -2719,7 +2791,7 @@
             infocards.appendChild(LotteryDetailInfo);
         }
     }
-    /**主函数 */
+    /**主入口 */
     (async function main() {
         Base.addCss('layerCss', 'code{padding:.2em .4em;margin:0;font-size:85%;background-color:rgb(27 31 35 / 5%);border-radius:6px}');
         if (!Base.checkHref(window.location.href) || !Base.checkBrowser(navigator.appVersion)) return;
@@ -2813,7 +2885,10 @@
                 Tooltip.log(`${scan_time}分钟后再次扫描`);
                 setTimeout(() => {
                     eventBus.emit('Turn_on_the_Monitor');
-                }, Number(config.scan_time))
+                }, Number(config.scan_time));
+                Base.getHiToKoTo().then(sentence => {
+                    BiliAPI.createDynamic(sentence);
+                })
                 return;
             }
             let num = count.next();
