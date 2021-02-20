@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bili动态抽奖助手
 // @namespace    http://tampermonkey.net/
-// @version      3.9.4
+// @version      3.9.5
 // @description  自动参与B站"关注转发抽奖"活动
 // @author       shanmite
 // @include      /^https?:\/\/space\.bilibili\.com/[0-9]*/
@@ -130,8 +130,8 @@
          * @returns {boolean}
          */
         checkHref(href) {
-            const reg = /(?<=space\.bilibili\.com\/)[0-9]*(?=\/?)/;
-            if (reg.exec(href)[0] === GlobalVar.myUID) return true
+            const reg = /space\.bilibili\.com\/([0-9]*)/;
+            if (reg.exec(href)[1] === GlobalVar.myUID) return true
             Tooltip.log(document.title);
             return false
         },
@@ -769,7 +769,7 @@
                     hasCookies: false,
                     success: responseText => {
                         const res = Base.strToJson(responseText);
-                        /(?<=_prize_cmt":").*(?=")/.exec()
+                        /* /(?<=_prize_cmt":").*(?=")/.exec() */
                         if (res.code === 0) {
                             const timestamp10 = res.data.lottery_time,
                                 timestamp13 = timestamp10 * 1000,
@@ -1396,7 +1396,7 @@
                 return null;
             }
             /* 字符串防止损失精度 */
-            const offset = typeof data.offset === 'string' ? data.offset : /(?<=next_offset":)[0-9]*/.exec(res)[0]
+            const offset = typeof data.offset === 'string' ? data.offset : /next_offset":([0-9]*)/.exec(res)[1]
                 , next = {
                     has_more: data.has_more,
                     next_offset: offset
