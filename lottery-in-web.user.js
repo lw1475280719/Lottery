@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bili动态抽奖助手
 // @namespace    http://tampermonkey.net/
-// @version      3.9.3
+// @version      3.9.4
 // @description  自动参与B站"关注转发抽奖"活动
 // @author       shanmite
 // @include      /^https?:\/\/space\.bilibili\.com/[0-9]*/
@@ -116,7 +116,7 @@
         getHiToKoTo() {
             return new Promise(resolve => {
                 Ajax.get({
-                    url: 'https://v1.hitokoto.cn/?encode=text&c=a&c=b&c=c&c=e',
+                    url: 'https://v1.hitokoto.cn/?encode=text&c=i',
                     hasCookies: false,
                     success: responseText => {
                         resolve(responseText)
