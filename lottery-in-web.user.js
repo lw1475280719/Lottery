@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bili动态抽奖助手
 // @namespace    http://tampermonkey.net/
-// @version      3.9.2
+// @version      3.9.3
 // @description  自动参与B站"关注转发抽奖"活动
 // @author       shanmite
 // @include      /^https?:\/\/space\.bilibili\.com/[0-9]*/
@@ -1939,6 +1939,10 @@
                                                         createCompleteElement({
                                                             tagname: 'p',
                                                             text: '默认移除所有<strong>转发动态</strong>或临时关注的up, <br>使用前请在在白名单内填入不想移除的动态ID或up主的UID, <br>可定期使用此功能清空无法处理的动态和本地存储信息。',
+                                                        }),
+                                                        createCompleteElement({
+                                                            tagname: 'p',
+                                                            text: '<strong>需注意</strong>取关白名单对推荐模式无效,移除关注会直接移除<br>强力模式下移除关注是在抽奖临时关注分区内进行,不会误取关',
                                                         }),
                                                         createCompleteElement({
                                                             tagname: 'span',
