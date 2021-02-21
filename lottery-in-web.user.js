@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bili动态抽奖助手
 // @namespace    http://tampermonkey.net/
-// @version      3.9.6
+// @version      3.9.7
 // @description  自动参与B站"关注转发抽奖"活动
 // @author       shanmite
 // @include      /^https?:\/\/space\.bilibili\.com/[0-9]*/
@@ -2894,7 +2894,7 @@
                 setTimeout(() => {
                     eventBus.emit('Turn_on_the_Monitor');
                 }, Number(config.scan_time));
-                if (scan_times.value % 2 === 0) {
+                if (scan_times.value() % 2 === 0) {
                     Base.getHiToKoTo().then(sentence => {
                         BiliAPI.createDynamic(sentence);
                     })
