@@ -769,7 +769,6 @@
                     hasCookies: false,
                     success: responseText => {
                         const res = Base.strToJson(responseText);
-                        /* /(?<=_prize_cmt":").*(?=")/.exec() */
                         if (res.code === 0) {
                             const timestamp10 = res.data.lottery_time,
                                 timestamp13 = timestamp10 * 1000,
@@ -2890,9 +2889,11 @@
                 setTimeout(() => {
                     eventBus.emit('Turn_on_the_Monitor');
                 }, Number(config.scan_time));
-                Base.getHiToKoTo().then(sentence => {
-                    BiliAPI.createDynamic(sentence);
-                })
+                if (scan_times.value % 2 === 0) {
+                    Base.getHiToKoTo().then(sentence => {
+                        BiliAPI.createDynamic(sentence);
+                    })
+                }
                 return;
             }
             let num = count.next();
