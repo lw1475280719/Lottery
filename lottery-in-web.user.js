@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bili动态抽奖助手
 // @namespace    http://tampermonkey.net/
-// @version      3.9.7
+// @version      3.9.8
 // @description  自动参与B站"关注转发抽奖"活动
 // @author       shanmite
 // @include      /^https?:\/\/space\.bilibili\.com/[0-9]*/
@@ -116,11 +116,12 @@
         getHiToKoTo() {
             return new Promise(resolve => {
                 Ajax.get({
-                    url: 'https://v1.hitokoto.cn/?encode=text&c=i',
+                    url: 'https://v1.hitokoto.cn/?encode=json&c=i',
                     hasCookies: false,
                     success: responseText => {
-                        if (Date.now() % 7) {
-                            resolve(responseText)
+                        const { hitokkoto } = this.strToJson(responseText);
+                        if (hitokkoto && (Date.now() % 7)) {
+                            resolve(hitokkoto)
                         } else {
                             resolve('发条动态证明自己是真人[doge][doge][doge]')
                         }
@@ -2894,12 +2895,14 @@
                 setTimeout(() => {
                     eventBus.emit('Turn_on_the_Monitor');
                 }, Number(config.scan_time));
-                if (scan_times.value() % 2 === 0) {
-                    Base.getHiToKoTo().then(sentence => {
-                        BiliAPI.createDynamic(sentence);
-                    })
-                }
-                return;
+                Public.prototype.checkAllDynamic(GlobalVar.myUID, 1).then(Dynamic => {
+                    if (Dynamic.allModifyDynamicResArray[0].type === 1) {
+                        Base.getHiToKoTo().then(sentence => {
+                            BiliAPI.createDynamic(sentence);
+                        })
+                    }
+                })
+                return
             }
             const lottery = Lottery[count.next()];
             const nlottery = Number(lottery);
