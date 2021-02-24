@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bili动态抽奖助手
 // @namespace    http://tampermonkey.net/
-// @version      3.9.8
+// @version      3.9.9
 // @description  自动参与B站"关注转发抽奖"活动
 // @author       shanmite
 // @include      /^https?:\/\/space\.bilibili\.com/[0-9]*/
@@ -123,7 +123,7 @@
                         if (hitokkoto && (Date.now() % 7)) {
                             resolve(hitokkoto)
                         } else {
-                            resolve('发条动态证明自己是真人[doge][doge][doge]')
+                            resolve('[doge][doge][doge]')
                         }
                     }
                 })
@@ -284,7 +284,8 @@
                     method: "GET",
                     url: "https://gitee.com/shanmite/lottery-notice/raw/master/notice.json",
                     onload: function (response) {
-                        resolve(JSON.parse(response.responseText));
+                        const res = Base.strToJson((response || {}).responseText)
+                        resolve(res);
                     }
                 });
             })
@@ -2805,20 +2806,27 @@
         Base.addCss('layerCss', 'code{padding:.2em .4em;margin:0;font-size:85%;background-color:rgb(27 31 35 / 5%);border-radius:6px}');
         if (!Base.checkHref(window.location.href) || !Base.checkBrowser(navigator.appVersion)) return;
         await GlobalVar.getAllMyLotteryInfo(); /* 转发信息初始化 */
-        const remoteparm = await Base.getMyJson(); /* 获取热更新的默认设置 */
-        /** 默认设置 */
-        const remoteconfig = remoteparm.config;
-        config = remoteconfig; /**设置初始化 */
-        /**是否有最新版 */
-        if (Base.checkVersion(remoteparm.version) > Base.checkVersion(Script.version)) {
-            const { version, message } = remoteparm;
-            Toollayer.confirm(
-                '更新提醒',
-                `最新版本为 <strong>${version}</strong><br>${message}<br>是否更新?`,
-                ['是', '否'],
-                () => { window.location.href = 'https://greasyfork.org/zh-CN/scripts/412468-bili%E5%8A%A8%E6%80%81%E6%8A%BD%E5%A5%96%E5%8A%A9%E6%89%8B' },
-                () => { Toollayer.msg('稍后更新') }
-            );
+        let remoteparm = await Base.getMyJson(); /* 获取热更新的默认设置 */
+        let isRemoteParmError = false;
+        let remoteconfig = {};
+        if (remoteparm.config) {
+            /** 默认设置 */
+            remoteconfig = remoteparm.config;
+            config = remoteconfig; /**设置初始化 */
+            /**是否有最新版 */
+            if (Base.checkVersion(remoteparm.version) > Base.checkVersion(Script.version)) {
+                const { version, message } = remoteparm;
+                Toollayer.confirm(
+                    '更新提醒',
+                    `最新版本为 <strong>${version}</strong><br>${message}<br>是否更新?`,
+                    ['是', '否'],
+                    () => { window.location.href = 'https://greasyfork.org/zh-CN/scripts/412468-bili%E5%8A%A8%E6%80%81%E6%8A%BD%E5%A5%96%E5%8A%A9%E6%89%8B' },
+                    () => { Toollayer.msg('稍后更新') }
+                );
+            }
+        } else {
+            Tooltip.log('获取远程设置错误, 访问被拒绝, 稍后再来');
+            isRemoteParmError = true;
         }
         /* 注册事件 BEGIN */
         let Lottery;
@@ -2831,46 +2839,52 @@
             } else {
                 /**本地设置 */
                 let _config = JSON.parse(configstr);
-                const config_keys = [
-                    "model",
-                    "chatmodel",
-                    "only_followed",
-                    "maxday",
-                    "scan_time",
-                    "wait",
-                    "minfollower",
-                    "blockword",
-                    "blacklist",
-                    "whitelist",
-                    "relay",
-                    "chat",
-                    "UIDs",
-                    "TAGs"
-                ];
-                config = {
-                    ...remoteconfig,
-                    ..._config,
-                    "blacklist": Array.from(new Set([..._config["blacklist"].split(','), ...remoteconfig["blacklist"].split(',')])).toString()
-                }
-                /**更新设置选项 */
-                const flush = remoteparm.flush;
-                if (typeof flush === "string" && flush.indexOf('1') !== -1) {
-                    const flush_time = remoteparm.flush_time;
-                    if (flush_time !== await Base.storage.get("flush_time")) {
-                        Toollayer.confirm(
-                            '需要更新设置',
-                            `${remoteparm.flush_msg}`,
-                            ['是', '否'],
-                            () => {
-                                [...flush].forEach((isflush, i) => {
-                                    const key = config_keys[i]
-                                    if (isflush) _config[key] = remoteconfig[key];
-                                })
-                                eventBus.emit('Modify_settings', JSON.stringify(_config));
-                                Base.storage.set("flush_time", flush_time)
-                            },
-                            () => { Toollayer.msg('稍后更新') }
-                        );
+                if (Object.keys(_config).length) {
+                    if (isRemoteParmError) {
+                        config = _config
+                    } else {
+                        const config_keys = [
+                            "model",
+                            "chatmodel",
+                            "only_followed",
+                            "maxday",
+                            "scan_time",
+                            "wait",
+                            "minfollower",
+                            "blockword",
+                            "blacklist",
+                            "whitelist",
+                            "relay",
+                            "chat",
+                            "UIDs",
+                            "TAGs"
+                        ];
+                        config = {
+                            ...remoteconfig,
+                            ..._config,
+                            "blacklist": Array.from(new Set([..._config["blacklist"].split(','), ...remoteconfig["blacklist"].split(',')])).toString()
+                        }
+                        /**更新设置选项 */
+                        const flush = remoteparm.flush;
+                        if (typeof flush === "string" && flush.indexOf('1') !== -1) {
+                            const flush_time = remoteparm.flush_time;
+                            if (flush_time !== await Base.storage.get("flush_time")) {
+                                Toollayer.confirm(
+                                    '需要更新设置',
+                                    `${remoteparm.flush_msg}`,
+                                    ['是', '否'],
+                                    () => {
+                                        [...flush].forEach((isflush, i) => {
+                                            const key = config_keys[i]
+                                            if (isflush) _config[key] = remoteconfig[key];
+                                        })
+                                        eventBus.emit('Modify_settings', JSON.stringify(_config));
+                                        Base.storage.set("flush_time", flush_time)
+                                    },
+                                    () => { Toollayer.msg('稍后更新') }
+                                );
+                            }
+                        }
                     }
                 }
             }
