@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bili动态抽奖助手
 // @namespace    http://tampermonkey.net/
-// @version      3.9.9
+// @version      3.9.10
 // @description  自动参与B站"关注转发抽奖"活动
 // @author       shanmite
 // @include      /^https?:\/\/space\.bilibili\.com/[0-9]*/
@@ -119,9 +119,9 @@
                     url: 'https://v1.hitokoto.cn/?encode=json&c=i',
                     hasCookies: false,
                     success: responseText => {
-                        const { hitokkoto } = this.strToJson(responseText);
-                        if (hitokkoto && (Date.now() % 7)) {
-                            resolve(hitokkoto)
+                        const { hitokoto } = Base.strToJson(responseText);
+                        if (hitokoto && (Date.now() % 7)) {
+                            resolve(hitokoto)
                         } else {
                             resolve('[doge][doge][doge]')
                         }
@@ -1176,63 +1176,86 @@
          * 检查分区  
          * 不存在指定分区时创建  
          * 获取到tagid添加为对象的属性  
-         * @returns {Promise<number|0>}
+         * @returns {Promise<number>}
          */
-        checkMyPartition: () => {
+        checkMyPartition: (name = '此处存放因抽奖临时关注的up') => {
             return new Promise((resolve) => {
                 Ajax.get({
                     url: 'https://api.bilibili.com/x/relation/tags',
                     hasCookies: true,
                     success: responseText => {
                         const res = Base.strToJson(responseText);
-                        let tagid = 0;
+                        let tagid = undefined;
                         if (res.code === 0) {
-                            const data = res.data;
-                            for (let index = 0; index < data.length; index++) {
-                                const element = data[index];
-                                if (element.name === '此处存放因抽奖临时关注的up') {
-                                    Tooltip.log('[获取分区id]成功');
-                                    tagid = element.tagid;
-                                    break;
-                                }
+                            const data = res.data.filter((it) => it.name === name);
+                            if (data.length) {
+                                Tooltip.log('[获取分区id]成功');
+                                tagid = data[0].tagid
+                            } else {
+                                Tooltip.log('[获取分区id]失败 无指定分区');
                             }
-                            if (tagid === 0) {
-                                Ajax.post({
-                                    url: 'https://api.bilibili.com/x/relation/tag/create',
-                                    hasCookies: true,
-                                    dataType: 'application/x-www-form-urlencoded',
-                                    data: {
-                                        tag: '此处存放因抽奖临时关注的up',
-                                        csrf: GlobalVar.csrf
-                                    },
-                                    success: responseText => {
-                                        let obj = Base.strToJson(responseText);
-                                        if (obj.code === 0) {
-                                            Tooltip.log('[新建分区]分区新建成功')
-                                            tagid = obj.data.tagid /* 获取tagid */
-                                            resolve(tagid)
-                                        } else {
-                                            Tooltip.warn(`[新建分区]分区新建失败\n${responseText}`);
-                                            resolve(tagid);
-                                        }
+                            if (typeof tagid === 'undefined') {
+                                if (name === '此处存放因抽奖临时关注的up') {
+                                    BiliAPI.createPartition(name).then(id => {
+                                        resolve(id)
+                                    })
+                                } else {
+                                    resolve(tagid)
+                                }
+                            } else {
+                                resolve(tagid)
+                            }
+                        } else {
+                            if (name === '此处存放因抽奖临时关注的up') {
+                                Tooltip.log(`[获取分区id]访问出错,尝试从本地存储中获取\n${responseText}`);
+                                Base.storage.get(`${GlobalVar.myUID}tagid`).then(td => {
+                                    if (td) {
+                                        Tooltip.log('[获取分区id]成功');
+                                        resolve(Number(td));
+                                    } else {
+                                        console.log('本地未存储');
+                                        resolve(tagid)
                                     }
                                 })
                             } else {
-                                Base.storage.set(`${GlobalVar.myUID}tagid`, tagid);
-                                resolve(tagid);
+                                Tooltip.warn(`[获取分区id]访问出错\n${responseText}`)
+                                resolve(tagid)
                             }
-                        } else {
-                            Tooltip.log(`[获取分区id]访问出错,尝试从本地存储中获取\n${responseText}`);
-                            Base.storage.get(`${GlobalVar.myUID}tagid`)
-                                .then(td => {
-                                    Tooltip.log('[获取分区id]成功');
-                                    resolve(Number(td));
-                                })
                         }
                     }
                 })
             });
         },
+        /**
+         * 创造分区
+         * @param {string} partition_name
+         * @returns {Promise<number>}
+         */
+        createPartition: (partition_name) => {
+            return new Promise((resolve) => {
+                Ajax.post({
+                    url: 'https://api.bilibili.com/x/relation/tag/create',
+                    hasCookies: true,
+                    dataType: 'application/x-www-form-urlencoded',
+                    data: {
+                        tag: partition_name,
+                        csrf: GlobalVar.csrf
+                    },
+                    success: responseText => {
+                        let obj = Base.strToJson(responseText);
+                        if (obj.code === 0) {
+                            Tooltip.log('[新建分区]分区新建成功')
+                            let { tagid } = obj.data /* 获取tagid */
+                            Base.storage.set(`${GlobalVar.myUID}tagid`, tagid)
+                            resolve(tagid)
+                        } else {
+                            Tooltip.warn(`[新建分区]分区新建失败\n${responseText}`);
+                            resolve(undefined);
+                        }
+                    }
+                })
+            })
+        }
     }
     /**
      * 贮存全局变量
@@ -1580,7 +1603,7 @@
         async init() {
             if (config.model === '00') { Tooltip.log('已关闭所有转发行为'); return }
             const tagid = await BiliAPI.checkMyPartition();
-            if (tagid === 0) { Tooltip.log('未能成功获取关注分区id'); return }
+            if (!tagid) { Tooltip.warn('未能成功获取关注分区id'); return }
             this.tagid = tagid; /* 检查关注分区 */
             this.attentionList = await BiliAPI.getAttentionList(GlobalVar.myUID);
             this.AllMyLotteryInfo = Object.keys(Base.strToJson(await GlobalVar.getAllMyLotteryInfo())).toString();
@@ -1939,6 +1962,10 @@
                                                             text: '使用存储在本地的动态id和开奖时间判断是否中奖, <br>若中奖会有弹窗提示, 否则移除已开奖的动态并取关up主。',
                                                         }),
                                                         createCompleteElement({
+                                                            tagname: 'p',
+                                                            text: '<strong>需注意</strong>未填写白名单移除关注时会直接移除<br><br>',
+                                                        }),
+                                                        createCompleteElement({
                                                             tagname: 'h3',
                                                             text: '强力模式:',
                                                         }),
@@ -1947,12 +1974,8 @@
                                                             text: '默认移除所有<strong>转发动态</strong>或临时关注的up, <br>使用前请在在白名单内填入不想移除的动态ID或up主的UID, <br>可定期使用此功能清空无法处理的动态和本地存储信息。',
                                                         }),
                                                         createCompleteElement({
-                                                            tagname: 'p',
-                                                            text: '<strong>需注意</strong>取关白名单对推荐模式无效,移除关注会直接移除<br>强力模式下移除关注是在抽奖临时关注分区内进行,不会误取关',
-                                                        }),
-                                                        createCompleteElement({
                                                             tagname: 'span',
-                                                            text: '移除',
+                                                            text: '<strong>移除</strong>',
                                                         }),
                                                         createCompleteElement({
                                                             tagname: 'input',
@@ -1981,6 +2004,9 @@
                                                         createCompleteElement({
                                                             tagname: 'label',
                                                             text: '转发的动态',
+                                                            attr: {
+                                                                style: 'padding-right: 10px'
+                                                            },
                                                             children: [
                                                                 createCompleteElement({
                                                                     tagname: 'input',
@@ -2009,6 +2035,22 @@
                                                                     },
                                                                 })
                                                             ]
+                                                        }),
+                                                        createCompleteElement({
+                                                            tagname: 'span',
+                                                            text: '<br><strong>取关</strong>',
+                                                        }),
+                                                        createCompleteElement({
+                                                            tagname: 'input',
+                                                            attr: {
+                                                                type: 'text',
+                                                                name: 'fenqu',
+                                                                value: '此处存放因抽奖临时关注的up',
+                                                            }
+                                                        }),
+                                                        createCompleteElement({
+                                                            tagname: 'span',
+                                                            text: '分区',
                                                         }),
                                                     ]
                                                 })
@@ -2421,6 +2463,7 @@
                             () => {
                                 let [i, j, k, time] = [0, 0, 0, 0];
                                 const linkMsg = (link, msg = link) => '<a href="' + link + 'target="_blank" style = "color:#00a1d6;text-decoration:underline;">' + msg + '</a>';
+                                const { whitelist } = config;
                                 async function rm(model) {
                                     const str = await GlobalVar.getAllMyLotteryInfo()
                                         , AllMyLotteryInfo = JSON.parse(str);
@@ -2434,8 +2477,8 @@
                                         const { isMe } = await BiliAPI.getLotteryNotice(dyid);
                                         isMe === '中奖了！！！' ? Toollayer.alert('恭喜！！！中奖了', `前往 ${linkMsg(`https://t.bilibili.com/${dyid}`)} 查看。`) : Tooltip.log('未中奖');
                                         Tooltip.log(`移除过期官方或非官方动态${dyid}`);
-                                        if (typeof dyid === 'string' && dyid !== '' && model[0] === '1') BiliAPI.rmDynamic(dyid);
-                                        if (typeof ouid === 'number' && model[1] === '1') BiliAPI.cancelAttention(ouid);
+                                        if (typeof dyid === 'string' && dyid !== '' && model[0] === '1' && !(new RegExp(dyid)).test(whitelist)) BiliAPI.rmDynamic(dyid);
+                                        if (typeof ouid === 'number' && model[1] === '1' && !(new RegExp(ouid)).test(whitelist)) BiliAPI.cancelAttention(ouid);
                                         await GlobalVar.deleteLotteryInfo(odyid);
                                         await Base.delay(time * 1000);
                                     }
@@ -2474,10 +2517,11 @@
                                         const {
                                             day,
                                             page,
-                                            type: dytype
+                                            type: dytype,
+                                            fenqu
                                         } = rmdyForm;
                                         const _time = Date.now() / 1000 - Number(day.value) * 86400;
-                                        const tagid = await BiliAPI.checkMyPartition();
+                                        const tagid = await BiliAPI.checkMyPartition(fenqu.value);
                                         async function delDynamic() {
                                             for (let index = 0; index < 1000; index++) {
                                                 const { allModifyDynamicResArray, offset: _offset } = await self.checkAllDynamic(GlobalVar.myUID, 1, Number(time) * 1000, offset);
@@ -2503,7 +2547,7 @@
                                             p1.resolve();
                                         }
                                         async function unFollow() {
-                                            if (tagid === 0) { Tooltip.log('未能成功获取关注分区id'); return }
+                                            if (typeof tagid === 'undefined') { Tooltip.warn('未能成功获取关注分区id'); return }
                                             let rmup = [];
                                             for (let index = 1; index < 42; index++) {
                                                 const uids = await BiliAPI.getPartitionUID(tagid, index);
@@ -2543,7 +2587,7 @@
                                                 () => {
                                                     Toollayer.confirm(
                                                         '是否清空本地存储',
-                                                        '请点击确定以清空本地存储。',
+                                                        '请点击确定以清空本地存储。之前转发过的内容会再次转发',
                                                         ['确定', '取消'],
                                                         () => { Base.storage.set(GlobalVar.myUID, '{}') },
                                                         () => { Toollayer.msg('已取消') }
