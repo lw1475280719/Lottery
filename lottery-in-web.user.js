@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bili动态抽奖助手
 // @namespace    http://tampermonkey.net/
-// @version      3.9.10
+// @version      3.9.11
 // @description  自动参与B站"关注转发抽奖"活动
 // @author       shanmite
 // @include      /^https?:\/\/space\.bilibili\.com/[0-9]*/
@@ -1697,18 +1697,21 @@
                     if (isBlock) break;
                 }
                 if (isBlock) continue;
+                const hasAt = /(?:@|艾特)[^@|(艾特)]*?好友/.test(description);
+                const haslottery = /[抽奖]/.test(description);
+                const hasGuanZhuan = /[转关].*[转关]/.test(description);
                 if (hasOfficialLottery && model[0] === '1') {
                     const oneLNotice = await BiliAPI.getLotteryNotice(dyid);
                     ts = oneLNotice.ts;
                     isLottery = ts > now_ts_10 && ts < now_ts_10 + maxday;
                     isSendChat = chatmodel[0] === '1';
                 } else if (!hasOfficialLottery && model[1] === '1') {
-                    if (!/[抽奖]/.test(description)) continue;
+                    if (!haslottery) continue;
                     ts = Base.getLotteryNotice(description).ts;
                     if (!official_verify) {
                         const followerNum = await BiliAPI.getUserInfo(uid);
                         if (followerNum < Number(minfollower)) continue;
-                        isLottery = /[转关].*[转关]/.test(description) && !befilter && (ts === 0 || (ts > now_ts_10 && ts < now_ts_10 + maxday));
+                        isLottery = hasGuanZhuan && !befilter && (ts === 0 || (ts > now_ts_10 && ts < now_ts_10 + maxday));
                     } else {
                         isLottery = ts === 0 || (ts > now_ts_10 && ts < now_ts_10 + maxday);
                     }
@@ -1725,27 +1728,44 @@
                     if (!isFollowed) onelotteryinfo.uid.push(uid);
                     if (!isRelay) {
                         onelotteryinfo.dyid = dyid;
-                        const RandomStr = Base.getRandomStr(config.relay);
+                        let RandomStr = Base.getRandomStr(config.relay);
+                        let new_ctrl = [];
+                        if (hasAt) {
+                            /**如要修改请手动填写 */
+                            const _at = [
+                                ['转发抽奖娘', 294887687],
+                                ['你的工具人老公', 100680137]
+                            ];
+                            _at.forEach(it => {
+                                new_ctrl.push({
+                                    data: String(it[1]),
+                                    location: RandomStr.length,
+                                    length: it[0].length + 1,
+                                    type: 1
+                                })
+                                RandomStr += '@' + it[0]
+                            })
+                        }
                         if (type === 1) {
                             /* 转发内容长度+'//'+'@'+用户名+':'+源内容 */
                             const addlength = RandomStr.length + 2 + uname.length + 1 + 1;
                             onelotteryinfo.relay_chat = RandomStr + `//@${uname}:` + des;
-                            let new_ctrl = ctrl.map(item => {
-                                item.location += addlength;
-                                return item;
-                            })
-                            new_ctrl.unshift({
+                            new_ctrl.push({
                                 data: String(uid),
                                 location: RandomStr.length + 2,
                                 length: uname.length + 1,
                                 type: 1
                             })
-                            onelotteryinfo.ctrl = JSON.stringify(new_ctrl);
-                            if (!(new RegExp(uids[1])).test(self.attentionList)) onelotteryinfo.uid.push(uids[1]);
+                            ctrl.map(item => {
+                                item.location += addlength;
+                                return item;
+                            }).forEach(it => new_ctrl.push(it))
+                            if (!(new RegExp(uids[1])).test(self.attentionList))
+                                onelotteryinfo.uid.push(uids[1]);
                         } else {
                             onelotteryinfo.relay_chat = RandomStr;
-                            onelotteryinfo.ctrl = '[]'
                         }
+                        onelotteryinfo.ctrl = JSON.stringify(new_ctrl);
                     }
                     /* 根据动态的类型决定评论的类型 */
                     onelotteryinfo.type = type === 2 ?
