@@ -1453,7 +1453,7 @@
                     obj.official_verify = official_verify.type > -1 ? true : false; /* 是否官方号 */
                     obj.createtime = desc.timestamp /* 动态的ts10 */
                     obj.type = desc.type /* 动态类型 */
-                    obj.rid_str = obj.type === 1 ? desc.dynamic_id_str : desc.rid_str;/* 用于发送评论 */
+                    obj.rid_str = desc.rid_str.length > 12 ? desc.dynamic_id_str : desc.rid_str;/* 用于发送评论 */
                     obj.orig_type = desc.orig_type /* 源动态类型 */
                     obj.dynamic_id = desc.dynamic_id_str; /* 转发者的动态ID !!!!此为大数需使用字符串值,不然JSON.parse()会有丢失精度 */
                     const { extension, extend_json } = onecard;
@@ -1463,7 +1463,7 @@
                     obj.description = item.content || item.description || ''; /* 转发者的描述 */
                     if (obj.type === 1) {
                         obj.origin_uid = desc.origin.uid; /* 被转发者的UID */
-                        obj.origin_rid_str = desc.origin.rid_str /* 被转发者的rid(用于发评论) */
+                        obj.origin_rid_str = desc.origin.rid_str.length > 12 ? desc.origin.dynamic_id_str : desc.origin.rid_str; /* 被转发者的rid(用于发评论) */
                         obj.origin_dynamic_id = desc.orig_dy_id_str; /* 被转发者的动态的ID !!!!此为大数需使用字符串值,不然JSON.parse()会有丢失精度 */
                         const { origin_extension, origin_user } = cardToJson;
                         try {
