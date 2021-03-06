@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bili动态抽奖助手
 // @namespace    http://tampermonkey.net/
-// @version      3.9.11
+// @version      3.9.13
 // @description  自动参与B站"关注转发抽奖"活动
 // @author       shanmite
 // @include      /^https?:\/\/space\.bilibili\.com/[0-9]*/
@@ -108,26 +108,6 @@
          */
         getRandomStr(arr) {
             return arr[parseInt(Math.random() * arr.length)]
-        },
-        /**
-         * 一言接口
-         * @returns {Promise<string>}
-         */
-        getHiToKoTo() {
-            return new Promise(resolve => {
-                Ajax.get({
-                    url: 'https://v1.hitokoto.cn/?encode=json&c=i',
-                    hasCookies: false,
-                    success: responseText => {
-                        const { hitokoto } = Base.strToJson(responseText);
-                        if (hitokoto && (Date.now() % 7)) {
-                            resolve(hitokoto)
-                        } else {
-                            resolve('[doge][doge][doge]')
-                        }
-                    }
-                })
-            });
         },
         /**
          * 判断是否是自己的主页
@@ -286,6 +266,24 @@
                     onload: function (response) {
                         const res = Base.strToJson((response || {}).responseText)
                         resolve(res);
+                    },
+                    onerror: function () {
+                        resolve({});
+                    }
+                });
+            })
+        },
+        getPictures() {
+            return new Promise((resolve) => {
+                GM_xmlhttpRequest({
+                    method: "GET",
+                    url: "https://gitee.com/shanmite/lottery-notice/raw/master/pictures.json",
+                    onload: function (response) {
+                        const res = Base.strToJson((response || {}).responseText)
+                        resolve(res);
+                    },
+                    onerror: function () {
+                        resolve({});
                     }
                 });
             })
@@ -1075,20 +1073,39 @@
             })
         },
         /**
-         * 发布一条无图的动态
+         * @typedef Pictures
+         * @property {string} img_src
+         * 发布一条动态
          * @param {string} content
+         * @param {Array<Pictures>} pictures
          */
-        createDynamic: content => {
+        createDynamic: (content, pictures) => {
+            let data = {
+                csrf: GlobalVar.csrf,
+                extension: '{"emoji_type":1,"from":{"emoji_type":1},"flag_cfg":{}}'
+            }
+            let url;
+            if (content) {
+                url = 'https://api.vc.bilibili.com/dynamic_svr/v1/dynamic_svr/create'
+                data = {
+                    ...data,
+                    content,
+                }
+            }
+            if (pictures) {
+                url = 'https://api.vc.bilibili.com/dynamic_svr/v1/dynamic_svr/create_draw'
+                data = {
+                    ...data,
+                    biz: 3,
+                    category: 3,
+                    pictures: JSON.stringify(pictures)
+                }
+            }
             Ajax.post({
-                url: 'https://api.vc.bilibili.com/dynamic_svr/v1/dynamic_svr/create',
+                url,
                 hasCookies: true,
                 dataType: 'application/x-www-form-urlencoded',
-                data: {
-                    content,
-                    type: 4,
-                    extension: '{"emoji_type":1,"from":{"emoji_type":1},"flag_cfg":{}}',
-                    csrf: GlobalVar.csrf
-                },
+                data,
                 success: responseText => {
                     if (/^{"code":0/.test(responseText)) {
                         Tooltip.log('[发布动态]成功创建一条随机内容的动态');
@@ -2975,8 +2992,13 @@
                 }, Number(config.scan_time));
                 Public.prototype.checkAllDynamic(GlobalVar.myUID, 1).then(Dynamic => {
                     if (Dynamic.allModifyDynamicResArray[0].type === 1) {
-                        Base.getHiToKoTo().then(sentence => {
-                            BiliAPI.createDynamic(sentence);
+                        Base.getPictures().then(imgs => {
+                            let { img_src } = imgs;
+                            if (img_src) {
+                                BiliAPI.createDynamic('', [0, 0].map(() => img_src[~~(Math.random() * img_src.length)]));
+                            } else {
+                                BiliAPI.createDynamic('[doge][doge][doge]');
+                            }
                         })
                     }
                 })
