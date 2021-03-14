@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bili动态抽奖助手
 // @namespace    http://tampermonkey.net/
-// @version      3.9.14
+// @version      3.9.15
 // @description  自动参与B站"关注转发抽奖"活动
 // @author       shanmite
 // @include      /^https?:\/\/space\.bilibili\.com/[0-9]*/
@@ -402,7 +402,7 @@
     const Toollayer = (() => {
         const tools = {
             alert: (title, content) => {
-                layer.alert(content, { title: `<strong>${title}</strong>`, shade: 0, closeBtn: 0, offset: 't' });
+                layer.alert(content, { title: `<strong>${title}</strong>`, shade: 0, closeBtn: 0, offset: 't' ,time: 5000});
             },
             confirm: (title, content, btn, fn1 = function () { }, fn2 = function () { }, fn3 = function () { }) => {
                 layer.confirm(content,
