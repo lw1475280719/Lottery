@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bili动态抽奖助手
 // @namespace    http://tampermonkey.net/
-// @version      3.9.13
+// @version      3.9.14
 // @description  自动参与B站"关注转发抽奖"活动
 // @author       shanmite
 // @include      /^https?:\/\/space\.bilibili\.com/[0-9]*/
@@ -2222,6 +2222,25 @@
                                                             ]
                                                         }),
                                                         createCompleteElement({
+                                                            tagname: 'br',
+                                                        }),
+                                                        createCompleteElement({
+                                                            tagname: 'label',
+                                                            text: '发送一条动态防止被开奖机过滤',
+                                                            children: [
+                                                                createCompleteElement({
+                                                                    tagname: 'input',
+                                                                    attr: {
+                                                                        type: 'checkbox',
+                                                                        name: 'create_dy'
+                                                                    },
+                                                                    script: el => {
+                                                                        config.create_dy === '1' ? el.checked = 'checked' : void 0;
+                                                                    }
+                                                                })
+                                                            ]
+                                                        }),
+                                                        createCompleteElement({
                                                             tagname: 'p',
                                                             text: '开奖时间(默认-1:不限):',
                                                         }),
@@ -2644,6 +2663,7 @@
                             model: '',
                             chatmodel: '',
                             only_followed: '',
+                            create_dy: '',
                             maxday: '',
                             scan_time: '',
                             wait: '',
@@ -2660,6 +2680,7 @@
                             model,
                             chatmodel,
                             only_followed,
+                            create_dy,
                             maxday,
                             scan_time,
                             wait,
@@ -2677,6 +2698,7 @@
                             chatmodel[i].checked ? newConfig.chatmodel += '1' : newConfig.chatmodel += '0';
                         }
                         only_followed.checked ? newConfig.only_followed += '1' : newConfig.only_followed += '0';
+                        create_dy.checked ? newConfig.create_dy += '1' : newConfig.create_dy += '0';
                         newConfig.maxday = Number(maxday.value) < 0 ? '-1' : maxday.value;
                         newConfig.scan_time = (Number(scan_time.value) * 60000).toString();
                         newConfig.wait = (Number(wait.value) * 1000).toString();
@@ -2928,6 +2950,7 @@
                             "model",
                             "chatmodel",
                             "only_followed",
+                            "create_dy",
                             "maxday",
                             "scan_time",
                             "wait",
@@ -2990,18 +3013,20 @@
                 setTimeout(() => {
                     eventBus.emit('Turn_on_the_Monitor');
                 }, Number(config.scan_time));
-                Public.prototype.checkAllDynamic(GlobalVar.myUID, 1).then(Dynamic => {
-                    if (Dynamic.allModifyDynamicResArray[0].type === 1) {
-                        Base.getPictures().then(imgs => {
-                            let { img_src } = imgs;
-                            if (img_src) {
-                                BiliAPI.createDynamic('', [0, 0].map(() => img_src[~~(Math.random() * img_src.length)]));
-                            } else {
-                                BiliAPI.createDynamic('[doge][doge][doge]');
-                            }
-                        })
-                    }
-                })
+                if (config.create_dy === '1') {
+                    Public.prototype.checkAllDynamic(GlobalVar.myUID, 1).then(Dynamic => {
+                        if (Dynamic.allModifyDynamicResArray[0].type === 1) {
+                            Base.getPictures().then(imgs => {
+                                let { img_src } = imgs;
+                                if (img_src) {
+                                    BiliAPI.createDynamic('', [0, 0].map(() => img_src[~~(Math.random() * img_src.length)]));
+                                } else {
+                                    BiliAPI.createDynamic('[doge][doge][doge]');
+                                }
+                            })
+                        }
+                    })
+                }
                 return
             }
             const lottery = Lottery[count.next()];
