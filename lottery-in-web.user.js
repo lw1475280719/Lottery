@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bili动态抽奖助手
 // @namespace    http://tampermonkey.net/
-// @version      3.9.16
+// @version      3.9.17
 // @description  自动参与B站"关注转发抽奖"活动
 // @author       shanmite
 // @include      /^https?:\/\/space\.bilibili\.com/[0-9]*/
@@ -402,7 +402,7 @@
     const Toollayer = (() => {
         const tools = {
             alert: (title, content) => {
-                layer.alert(content, { title: `<strong>${title}</strong>`, shade: 0, closeBtn: 0, offset: 't' ,time: 5000});
+                layer.alert(content, { title: `<strong>${title}</strong>`, shade: 0, closeBtn: 0, offset: 't', time: 5000 });
             },
             confirm: (title, content, btn, fn1 = function () { }, fn2 = function () { }, fn3 = function () { }) => {
                 layer.confirm(content,
@@ -1387,7 +1387,7 @@
          * @returns {Promise<{allModifyDynamicResArray: UsefulDynamicInfo[];offset: string}>} 获取前 `pages*12` 个动态信息
          */
         async checkAllDynamic(hostuid, pages, time = 0, _offset = '0') {
-            Tooltip.log(`准备读取${pages}页自己的动态信息`);
+            Tooltip.log(`准备读取${pages}页${hostuid}的动态信息`);
             const mDR = this.modifyDynamicRes,
                 getOneDynamicInfoByUID = BiliAPI.getOneDynamicInfoByUID,
                 curriedGetOneDynamicInfoByUID = Base.curryify(getOneDynamicInfoByUID); /* 柯里化的请求函数 */
@@ -1569,34 +1569,25 @@
          */
         async getLotteryInfoByUID(UID) {
             Tooltip.log(`开始获取用户${UID}的动态信息`);
-            const self = this,
-                dy = await BiliAPI.getOneDynamicInfoByUID(UID, 0),
-                modDR = self.modifyDynamicRes(dy);
-            if (modDR === null) return null;
-            Tooltip.log(`成功获取用户${UID}的动态信息`);
-            const mDRdata = modDR.modifyDynamicResArray,
-                _fomatdata = mDRdata.map(o => {
-                    return {
-                        lottery_info_type: 'uid',
-                        uids: [o.uid, o.origin_uid],
-                        uname: o.origin_uname,
-                        ctrl: [],
-                        dyid: o.origin_dynamic_id,
-                        official_verify: o.origin_official_verify,
-                        befilter: false,
-                        rid: o.origin_rid_str,
-                        des: o.origin_description,
-                        type: o.orig_type,
-                        hasOfficialLottery: o.origin_hasOfficialLottery
-                    }
-                })
-            const fomatdata = _fomatdata.filter(a => {
-                if (a.type === 0) {
-                    return false
+            const { allModifyDynamicResArray: aMDRA } = await this.checkAllDynamic(UID, 6, 500);
+            if (!aMDRA.length) return null;
+            const fomatdata = aMDRA.map(o => {
+                return {
+                    lottery_info_type: 'uid',
+                    uids: [o.uid, o.origin_uid],
+                    uname: o.origin_uname,
+                    ctrl: [],
+                    dyid: o.origin_dynamic_id,
+                    official_verify: o.origin_official_verify,
+                    befilter: false,
+                    rid: o.origin_rid_str,
+                    des: o.origin_description,
+                    type: o.orig_type,
+                    hasOfficialLottery: o.origin_hasOfficialLottery
                 }
-                return true
-            })
-            return fomatdata
+            }).filter(a => a.type === 0 ? false : true)
+            Tooltip.log(`成功获取用户${UID}的动态信息`);
+            return fomatdata;
         }
     }
     /**
@@ -1646,26 +1637,22 @@
         async startLottery() {
             const allLottery = await this.filterLotteryInfo();
             const len = allLottery.length;
-            if (len === 0) {
-                eventBus.emit('Turn_on_the_Monitor');
-                return false;
-            } else {
-                for (const Lottery of allLottery) {
-                    await this.go(Lottery);
-                }
-                Tooltip.log('开始转发下一组动态');
-                eventBus.emit('Turn_on_the_Monitor');
-                return true;
+            Tooltip.log(`将转发${len}条动态`);
+            for (const Lottery of allLottery) {
+                await this.go(Lottery);
             }
+            Tooltip.log('开始转发下一组动态');
+            eventBus.emit('Turn_on_the_Monitor');
+            return len ? true : false
         }
         /**
-         * 保持800条动态
+         * 保持5000条动态
          */
         async clearDynamic() {
             const AllMyLotteryInfo = JSON.parse(await GlobalVar.getAllMyLotteryInfo());
             const keyArr = Object.keys(AllMyLotteryInfo);
-            if (keyArr.length > 1000) {
-                Tooltip.log('已储存1000条消息,开始删除最初转发的内容');
+            if (keyArr.length > 5000) {
+                Tooltip.log('已储存5000条消息,开始删除最初转发的内容');
                 for (let i = 0; i < keyArr.length - 1000; i++) {
                     let dyid = AllMyLotteryInfo[keyArr[i]][0];
                     GlobalVar.deleteLotteryInfo(keyArr[i]);
