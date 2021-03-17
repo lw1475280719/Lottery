@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bili动态抽奖助手
 // @namespace    http://tampermonkey.net/
-// @version      3.9.17
+// @version      3.9.18
 // @description  自动参与B站"关注转发抽奖"活动
 // @author       shanmite
 // @include      /^https?:\/\/space\.bilibili\.com/[0-9]*/
@@ -130,7 +130,7 @@
                 Toollayer.alert(Script.name, '当前浏览器内核为IE内核,请使用非IE内核浏览器!');
                 return false;
             }
-            if (!/Chrome/.test(browser)) Toollayer.alert(Script.name, '若出现问题请使用Chrome或Edge浏览器');
+            if (!/Chrome/.test(browser)) Tooltip.warn('若出现问题请使用Chrome或Edge浏览器');
             return true;
         },
         /**
