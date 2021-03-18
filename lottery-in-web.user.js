@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bili动态抽奖助手
 // @namespace    http://tampermonkey.net/
-// @version      3.9.18
+// @version      3.9.19
 // @description  自动参与B站"关注转发抽奖"活动
 // @author       shanmite
 // @include      /^https?:\/\/space\.bilibili\.com/[0-9]*/
@@ -1211,14 +1211,9 @@
                             } else {
                                 Tooltip.log('[获取分区id]失败 无指定分区');
                             }
-                            if (typeof tagid === 'undefined') {
-                                if (name === '此处存放因抽奖临时关注的up') {
-                                    BiliAPI.createPartition(name).then(id => {
-                                        resolve(id)
-                                    })
-                                } else {
-                                    resolve(tagid)
-                                }
+                            if (name === '此处存放因抽奖临时关注的up') {
+                                typeof tagid === 'undefined' ? BiliAPI.createPartition(name).then(id => resolve(id))
+                                    : Base.storage.set(`${GlobalVar.myUID}tagid`, tagid).then(() => resolve(tagid))
                             } else {
                                 resolve(tagid)
                             }
@@ -1611,7 +1606,7 @@
         async init() {
             if (config.model === '00') { Tooltip.log('已关闭所有转发行为'); return }
             const tagid = await BiliAPI.checkMyPartition();
-            if (!tagid) { Tooltip.warn('未能成功获取关注分区id'); return }
+            if (typeof tagid === 'undefined') { Tooltip.warn('未能成功获取关注分区id'); return }
             this.tagid = tagid; /* 检查关注分区 */
             this.attentionList = await BiliAPI.getAttentionList(GlobalVar.myUID);
             this.AllMyLotteryInfo = Object.keys(Base.strToJson(await GlobalVar.getAllMyLotteryInfo())).toString();
