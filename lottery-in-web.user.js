@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bili动态抽奖助手
 // @namespace    http://tampermonkey.net/
-// @version      3.9.19
+// @version      3.9.20
 // @description  自动参与B站"关注转发抽奖"活动
 // @author       shanmite
 // @include      /^https?:\/\/space\.bilibili\.com/[0-9]*/
@@ -102,9 +102,9 @@
             return c
         },
         /**
-         * 随机获取字符串数组中的字符串
-         * @param {string[]} arr
-         * @returns {string}
+         * 随机获取数组中的一个元素
+         * @param {any[]} arr
+         * @returns {any}
          */
         getRandomStr(arr) {
             return arr[parseInt(Math.random() * arr.length)]
@@ -1073,47 +1073,51 @@
             })
         },
         /**
-         * @typedef Pictures
+         * @typedef Picture
          * @property {string} img_src
+         * @property {number} img_width
+         * @property {number} img_height
          * 发布一条动态
-         * @param {string} content
-         * @param {Array<Pictures>} pictures
+         * @param { string | Picture[] } content
+         * @return {Promise<void>}
          */
-        createDynamic: (content, pictures) => {
+        createDynamic: (content) => {
             let data = {
                 csrf: GlobalVar.csrf,
                 extension: '{"emoji_type":1,"from":{"emoji_type":1},"flag_cfg":{}}'
             }
-            let url;
-            if (content) {
+            let url = '';
+            if (content instanceof Array) {
+                url = 'https://api.vc.bilibili.com/dynamic_svr/v1/dynamic_svr/create_draw'
+                data = {
+                    ...data,
+                    biz: 3,
+                    category: 3,
+                    pictures: JSON.stringify(content)
+                }
+            } else {
                 url = 'https://api.vc.bilibili.com/dynamic_svr/v1/dynamic_svr/create'
                 data = {
                     ...data,
                     content,
                 }
             }
-            if (pictures) {
-                url = 'https://api.vc.bilibili.com/dynamic_svr/v1/dynamic_svr/create_draw'
-                data = {
-                    ...data,
-                    biz: 3,
-                    category: 3,
-                    pictures: JSON.stringify(pictures)
-                }
-            }
-            Ajax.post({
-                url,
-                hasCookies: true,
-                dataType: 'application/x-www-form-urlencoded',
-                data,
-                success: responseText => {
-                    if (/^{"code":0/.test(responseText)) {
-                        Tooltip.log('[发布动态]成功创建一条随机内容的动态');
-                    } else {
-                        Tooltip.warn(`[发布动态]发布动态失败\n${responseText}`);
+            return new Promise((resolve) => {
+                Ajax.post({
+                    url,
+                    hasCookies: true,
+                    dataType: 'application/x-www-form-urlencoded',
+                    data,
+                    success: responseText => {
+                        if (/^{"code":0/.test(responseText)) {
+                            Base.tooltip.log('[发布动态]成功创建一条随机内容的动态');
+                        } else {
+                            Base.tooltip.warn(`[发布动态]发布动态失败\n${responseText}`);
+                        }
+                        resolve()
                     }
-                }
-            })
+                })
+            });
         },
         /**
          * 移除动态
@@ -2358,6 +2362,20 @@
                                                         }),
                                                         createCompleteElement({
                                                             tagname: 'p',
+                                                            text: '随机动态内容:',
+                                                        }),
+                                                        createCompleteElement({
+                                                            tagname: 'textarea',
+                                                            attr: {
+                                                                cols: '65',
+                                                                rows: '10',
+                                                                name: 'dy_contents',
+                                                                title: '此处内容格式详见云端版说明'
+                                                            },
+                                                            text: JSON.stringify(config.dy_contents),
+                                                        }),
+                                                        createCompleteElement({
+                                                            tagname: 'p',
                                                             text: '监视的UID:',
                                                         }),
                                                         createCompleteElement({
@@ -2646,6 +2664,7 @@
                             chatmodel: '',
                             only_followed: '',
                             create_dy: '',
+                            dy_contents: [],
                             maxday: '',
                             scan_time: '',
                             wait: '',
@@ -2663,6 +2682,7 @@
                             chatmodel,
                             only_followed,
                             create_dy,
+                            dy_contents,
                             maxday,
                             scan_time,
                             wait,
@@ -2688,6 +2708,7 @@
                         newConfig.blockword = blockword.value.split(',');
                         newConfig.blacklist = blacklist.value;
                         newConfig.whitelist = whitelist.value;
+                        newConfig.dy_contents = JSON.parse(dy_contents.value);
                         newConfig.relay = relay.value.split(',');
                         newConfig.chat = chat.value.split(',');
                         newConfig.UIDs = UIDs.value.split(',');
@@ -2933,6 +2954,7 @@
                             "chatmodel",
                             "only_followed",
                             "create_dy",
+                            "dy_contents",
                             "maxday",
                             "scan_time",
                             "wait",
@@ -2996,16 +3018,9 @@
                     eventBus.emit('Turn_on_the_Monitor');
                 }, Number(config.scan_time));
                 if (config.create_dy === '1') {
-                    Public.prototype.checkAllDynamic(GlobalVar.myUID, 1).then(Dynamic => {
+                    Public.prototype.checkAllDynamic(GlobalVar.myUID, 1).then(async Dynamic => {
                         if (Dynamic.allModifyDynamicResArray[0].type === 1) {
-                            Base.getPictures().then(imgs => {
-                                let { img_src } = imgs;
-                                if (img_src) {
-                                    BiliAPI.createDynamic('', [0, 0].map(() => img_src[~~(Math.random() * img_src.length)]));
-                                } else {
-                                    BiliAPI.createDynamic('[doge][doge][doge]');
-                                }
-                            })
+                            await BiliAPI.createDynamic(Base.getRandomStr(config.dy_contents));
                         }
                     })
                 }
