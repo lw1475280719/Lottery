@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bili动态抽奖助手
 // @namespace    http://tampermonkey.net/
-// @version      3.9.22
+// @version      3.9.23
 // @description  自动参与B站"关注转发抽奖"活动
 // @author       shanmite
 // @include      /^https?:\/\/space\.bilibili\.com/[0-9]*/
@@ -1712,7 +1712,7 @@
                 }
                 if (isBlock) continue;
                 const needAt = /(?:@|艾特)[^@|(艾特)]*?好友/.test(description);
-                const needTopic = /[带加上](?:话题|tag)(#.*#)/i.exec(description)?.[1];
+                const needTopic = (/[带加上](?:话题|tag)(#.*#)/i.exec(description) || [])[1];
                 const isTwoLevelRelay = /\/\/@/.test(description);
                 const haslottery = /[抽奖]/.test(description);
                 const hasGuanZhuan = /[转关].*[转关]/.test(description);
