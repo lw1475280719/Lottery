@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bili动态抽奖助手
 // @namespace    http://tampermonkey.net/
-// @version      3.9.20
+// @version      3.9.21
 // @description  自动参与B站"关注转发抽奖"活动
 // @author       shanmite
 // @include      /^https?:\/\/space\.bilibili\.com/[0-9]*/
@@ -1678,12 +1678,23 @@
                 protoLotteryInfo = typeof self.UID === 'number' ?
                     await self.getLotteryInfoByUID(self.UID) :
                     await self.getLotteryInfoByTag(self.tag_name);
+            let _protoLotteryInfo = [];
             if (protoLotteryInfo === null) return [];
             let alllotteryinfo = [];
             const { model, chatmodel, only_followed, maxday: _maxday, minfollower, blockword, blacklist } = config;
             const maxday = _maxday === '-1' || _maxday === '' ? Infinity : (Number(_maxday) * 86400);
             for (const info of protoLotteryInfo) {
                 const { lottery_info_type, uids, uname, dyid, official_verify, ctrl, befilter, rid, des, type, hasOfficialLottery } = info;
+                /**判断是否重复 */
+                let isRepeat = false;
+                for (const i of _protoLotteryInfo) {
+                    if (dyid === i.dyid || (des && des === i.des)) {
+                        isRepeat = true;
+                        break;
+                    }
+                }
+                if (isRepeat) continue;
+                _protoLotteryInfo.push(info);
                 /**判断是转发源动态还是现动态 */
                 const uid = lottery_info_type === 'tag' ? uids[0] : uids[1];
                 const now_ts_10 = Date.now() / 1000;
