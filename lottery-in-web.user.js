@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bili动态抽奖助手
 // @namespace    http://tampermonkey.net/
-// @version      3.9.21
+// @version      3.9.22
 // @description  自动参与B站"关注转发抽奖"活动
 // @author       shanmite
 // @include      /^https?:\/\/space\.bilibili\.com/[0-9]*/
@@ -1711,7 +1711,9 @@
                     if (isBlock) break;
                 }
                 if (isBlock) continue;
-                const hasAt = /(?:@|艾特)[^@|(艾特)]*?好友/.test(description);
+                const needAt = /(?:@|艾特)[^@|(艾特)]*?好友/.test(description);
+                const needTopic = /[带加上](?:话题|tag)(#.*#)/i.exec(description)?.[1];
+                const isTwoLevelRelay = /\/\/@/.test(description);
                 const haslottery = /[抽奖]/.test(description);
                 const hasGuanZhuan = /[转关].*[转关]/.test(description);
                 if (hasOfficialLottery && model[0] === '1') {
@@ -1719,13 +1721,12 @@
                     ts = oneLNotice.ts;
                     isLottery = ts > now_ts_10 && ts < now_ts_10 + maxday;
                     isSendChat = chatmodel[0] === '1';
-                } else if (!hasOfficialLottery && model[1] === '1') {
-                    if (!haslottery) continue;
+                } else if (!hasOfficialLottery && model[1] === '1' && haslottery && hasGuanZhuan && !isTwoLevelRelay) {
                     ts = Base.getLotteryNotice(description).ts;
                     if (!official_verify) {
                         const followerNum = await BiliAPI.getUserInfo(uid);
                         if (followerNum < Number(minfollower)) continue;
-                        isLottery = hasGuanZhuan && !befilter && (ts === 0 || (ts > now_ts_10 && ts < now_ts_10 + maxday));
+                        isLottery = !befilter && (ts === 0 || (ts > now_ts_10 && ts < now_ts_10 + maxday));
                     } else {
                         isLottery = ts === 0 || (ts > now_ts_10 && ts < now_ts_10 + maxday);
                     }
@@ -1744,7 +1745,10 @@
                         onelotteryinfo.dyid = dyid;
                         let RandomStr = Base.getRandomStr(config.relay);
                         let new_ctrl = [];
-                        if (hasAt) {
+                        if (needTopic) {
+                            RandomStr += needTopic
+                        }
+                        if (needAt) {
                             /**如要修改请手动填写 */
                             const _at = [
                                 ['转发抽奖娘', 294887687],
