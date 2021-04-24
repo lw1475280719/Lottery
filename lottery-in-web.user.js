@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bili动态抽奖助手
 // @namespace    http://tampermonkey.net/
-// @version      3.9.23
+// @version      3.9.24
 // @description  自动参与B站"关注转发抽奖"活动
 // @author       shanmite
 // @include      /^https?:\/\/space\.bilibili\.com/[0-9]*/
@@ -668,8 +668,9 @@
                         if (res.code !== 0) {
                             Tooltip.warn('获取TagID失败');
                             resolve(-1)
+                        } else {
+                            resolve(res.data.tag_id)
                         }
-                        resolve(res.data.tag_id)
                     }
                 })
             });
@@ -2954,10 +2955,7 @@
         eventBus.on('Show_Main_Menu', async () => {
             Tooltip.log('加载主菜单');
             let configstr = await Base.storage.get('config');
-            if (typeof configstr === 'undefined') {
-                await Base.storage.set('config', JSON.stringify(config));
-                Tooltip.log('设置初始化成功');
-            } else {
+            if (configstr) {
                 /**本地设置 */
                 let _config = JSON.parse(configstr);
                 if (Object.keys(_config).length) {
@@ -3010,6 +3008,14 @@
                         }
                     }
                 }
+            } else {
+                if (isRemoteParmError) {
+                    Tooltip.warn('设置初始化失败');
+                    return;
+                } else {
+                    await Base.storage.set('config', JSON.stringify(config));
+                    Tooltip.log('设置初始化成功');
+                }
             }
             Lottery = [...config.UIDs, ...config.TAGs].filter(lottery => lottery !== '');
             (new MainMenu()).init();
@@ -3034,7 +3040,7 @@
                 }, Number(config.scan_time));
                 if (config.create_dy === '1') {
                     Public.prototype.checkAllDynamic(GlobalVar.myUID, 1).then(async Dynamic => {
-                        if (Dynamic.allModifyDynamicResArray[0].type === 1) {
+                        if ((Dynamic.allModifyDynamicResArray[0] || { type: 1 }).type === 1) {
                             await BiliAPI.createDynamic(Base.getRandomStr(config.dy_contents));
                         }
                     })
