@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bili动态抽奖助手
 // @namespace    http://tampermonkey.net/
-// @version      3.9.24
+// @version      3.9.25
 // @description  自动参与B站"关注转发抽奖"活动
 // @author       shanmite
 // @include      /^https?:\/\/space\.bilibili\.com/[0-9]*/
@@ -106,8 +106,12 @@
          * @param {any[]} arr
          * @returns {any}
          */
-        getRandomStr(arr) {
-            return arr[parseInt(Math.random() * arr.length)]
+        getRandomOne: arr => {
+            let RandomOne = null;
+            if (arr instanceof Array && arr.length) {
+                RandomOne = arr[parseInt(Math.random() * arr.length)];
+            }
+            return RandomOne
         },
         /**
          * 判断是否是自己的主页
@@ -1744,7 +1748,7 @@
                     if (!isFollowed) onelotteryinfo.uid.push(uid);
                     if (!isRelay) {
                         onelotteryinfo.dyid = dyid;
-                        let RandomStr = Base.getRandomStr(config.relay);
+                        let RandomStr = Base.getRandomOne(config.relay);
                         let new_ctrl = [];
                         if (needTopic) {
                             RandomStr += needTopic
@@ -1818,7 +1822,7 @@
                     }
                 })
                 if (typeof rid === 'string' && type !== 0) {
-                    BiliAPI.sendChat(rid, Base.getRandomStr(config.chat), type, true, dyid);
+                    BiliAPI.sendChat(rid, Base.getRandomOne(config.chat) || relay_chat, type, true, dyid);
                 }
                 await Base.delay(Number(config.wait));
             }
@@ -3041,7 +3045,7 @@
                 if (config.create_dy === '1') {
                     Public.prototype.checkAllDynamic(GlobalVar.myUID, 1).then(async Dynamic => {
                         if ((Dynamic.allModifyDynamicResArray[0] || { type: 1 }).type === 1) {
-                            await BiliAPI.createDynamic(Base.getRandomStr(config.dy_contents));
+                            await BiliAPI.createDynamic(Base.getRandomOne(config.dy_contents));
                         }
                     })
                 }
