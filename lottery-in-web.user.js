@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bili动态抽奖助手
 // @namespace    http://tampermonkey.net/
-// @version      3.9.25
+// @version      3.9.26
 // @description  自动参与B站"关注转发抽奖"活动
 // @author       shanmite
 // @include      /^https?:\/\/space\.bilibili\.com/[0-9]*/
@@ -2991,7 +2991,7 @@
                         }
                         /**更新设置选项 */
                         const flush = remoteparm.flush;
-                        if (typeof flush === "string" && flush.indexOf('1') !== -1) {
+                        if (flush instanceof Array && flush.indexOf(1) > -1) {
                             const flush_time = remoteparm.flush_time;
                             if (flush_time !== await Base.storage.get("flush_time")) {
                                 Toollayer.confirm(
